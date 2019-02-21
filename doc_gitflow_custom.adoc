@@ -4,7 +4,7 @@
 == Workflow Git
 === Generalites
 
-image:file/pgc1.png[link="pgc1.png",title="Gestion de configuration"]
+image:doc_file_pgc1.png[link="doc_file_pgc1.png",title="Gestion de configuration"]
 
 === Gestion de la configuration
 
@@ -42,7 +42,7 @@ Il existe deux manières de traiter les bugs sur la plateforme de production, le
 == Plateforme
 === Généralités
 
-image:file/pgc2.png[link="pgc2.png", title="Plateformes"]
+image:doc_file_pgc2.png[link="doc_file_pgc2.png", title="Plateformes"]
 
 Le projet est composé de 5 environnements dont 4 plateformes :
 
