@@ -1,0 +1,41 @@
+parameters:
+  bin_dir: "./bin"
+  git_dir: "."
+  process_timeout: 120
+  tasks:
+      phpcs:
+        standard: PSR2
+        ignore_patterns:
+          - "spec/*Spec.php"
+          - "tests/*.php"
+          - "src/Infras/Migrations/*.php"
+          - "features/**/*.php"
+          - "public/index.php"
+        metadata:
+          priority: 300
+      composer:
+        no_check_lock: true
+      yamllint:
+        ignore_patterns:
+          - "#test/(.*).yml#"
+      phplint: ~
+      phpparser:
+        visitors:
+          no_exit_statements: ~
+          forbidden_function_calls:
+            blacklist: [var_dump]
+        metadata:
+          priority: 100000
+      phpstan:
+        autoload_file: ~
+        configuration: ~
+        level: 0
+        force_patterns: ['src']
+        ignore_patterns: [
+          "spec",
+          "tests",
+          "src/Infras/Migrations/*.php",
+          "features/**/*.php",
+          "public/index.php"
+          ]
+        triggered_by: ['php']
