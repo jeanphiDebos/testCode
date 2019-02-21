@@ -1,0 +1,64 @@
+= Architecture de l'application
+:toc:
+
+== Assets
+Les dossiers assets contient les resources publiques du projets  c'est a dire les feuilles
+de style et les javascript.
+
+== Automation
+Contient les scripts et fichiers pour configurer les differents environnement.
+
+=== bin
+Contient les different scripts utile pour monter les enviroment.
+
+* .common contient des fonction generiques utile pour les autres scripts
+* build.sh script permettant de recuperer les dependances php et javascript.
+Il permet aussi de construire les assets pour la partie front.
+* code_sniffer.sh Lance l'analyse code_sniffer surtout utile pour la CI
+* deploy.sh Script de deploiment de l'application, il lance la commande ansistrano
+qui effectue le deploiement.
+* install.sh Script qui lance les migration de base de donnees, lance l'insertion de donnees
+dans la bdd comme les utilisateurs et autres donnees necessaire au bon fonctionnement de la plateorme
+* pemkey.sh Script de gestion de cle openssl
+* phpunit.sh Script pour lancer les TU en dev
+
+=== data
+Contient les donnees a partager avec le conteneur tel que les fichiers uploader ou les ficheirs
+a importer
+
+=== deploy
+Contient la configuration ansistrano necessaire pour deployer
+k
+
+=== docker
+Contient les fichiers de config pour les environnements de dev
+
+* elk les configs relative a la configuration de logstash.
+* nginx contient la configuration du server nginx
+* php-fpm contient le dockerfile et les fichiers ini pour le php
+
+=== config
+Ce dossier contient les configs de l'application et des differents bundle
+
+=== spec
+Contient les class de test PHPSPEC.
+
+== src
+Les source de l'application
+
+=== Application
+
+Contient les controller et de formType de l'Admin et de l'API.
+
+=== Domain
+Ce dossier contient le code metier de l'application. C'est a les Entites, des evenements
+et service metier.
+
+=== Infras
+Dans ce dossier ce trouvent les interactions avec la base de donnees, les envois de mail et autres.
+
+== templates
+Les fichiers twig et extensions twig.
+
+==
+Les tests unitaires PHPUnit
