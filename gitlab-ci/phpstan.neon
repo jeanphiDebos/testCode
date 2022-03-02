@@ -1,0 +1,13 @@
+parameters:
+    scanFiles:
+        - esp_ent/lib/TK/autoload.php
+    scanDirectories:
+        - esp_ent
+        - gener
+        - vendor
+    bootstrapFiles:
+        - esp_ent/lib/TK/autoload.php
+    level: 4
+    paths:
+        - esp_ent/templates_eparapheur
+    tmpDir: .tmp

@@ -1,0 +1,51 @@
+{
+    "files.encoding": "iso88591",
+    "editor.tabSize": 4,
+    "phpfmt.indent_with_space": 4,
+    "phpfmt.psr2": true,
+    "phpfmt.psr1": true,
+    "phpcs.standard": "phpcs.xml",
+    "phpcbf.standard": "phpcs.xml",
+    "phpmd.rules": "phpmd.xml",
+    "php-cs-fixer.config": "phpcsf.dist",
+    "php-cs-fixer.formatHtml": false,
+    "phpfmt.passes": ["AlignDoubleArrow"],
+    "git.ignoreLimitWarning": true,
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#385bc7",
+        "titleBar.activeBackground": "#2d499f",
+        "titleBar.inactiveBackground": "#2d499f99",
+        "statusBar.background": "#2d499f",
+        "statusBarItem.hoverBackground": "#385bc7"
+    },
+    "editor.defaultFormatter": null,
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
+    },
+    "[less]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
+    },
+    "[scss]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
+    },
+    "[css]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
+    },
+    "eslint.options": { "configFile": ".eslintrc.json" },
+    "css.validate": true,
+    "less.validate": true,
+    "scss.validate": true,
+    "stylelint.validate": ["css", "scss", "less"],
+    "editor.codeActionsOnSave": {
+        "source.fixAll.stylelint": true,
+        "source.fixAll.eslint": true
+    }
+}

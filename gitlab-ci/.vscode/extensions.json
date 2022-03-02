@@ -1,0 +1,25 @@
+{
+    "recommendations": [
+        "ms-mssql.data-workspace-vscode",
+        "editorconfig.editorconfig",
+        "dbaeumer.vscode-eslint",
+        "donjayamanne.githistory",
+        "vector-of-bool.gitflow",
+        "zignd.html-css-class-completion",
+        "christian-kohler.npm-intellisense",
+        "christian-kohler.path-intellisense",
+        "junstyle.php-cs-fixer",
+        "xdebug.php-debug",
+        "neilbrayfield.php-docblocker",
+        "bbenoist.vagrant",
+        "ms-mssql.mssql",
+        "ms-mssql.sql-database-projects-vscode",
+        "imperez.smarty",
+        "kokororin.vscode-phpfmt",
+        "ikappas.phpcs",
+        "persoderlind.vscode-phpcbf",
+        "xdebug.php-pack",
+        "stylelint.vscode-stylelint",
+        "esbenp.prettier-vscode"
+    ]
+}

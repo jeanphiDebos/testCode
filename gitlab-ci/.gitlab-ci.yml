@@ -1,0 +1,536 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/PHP.gitlab-ci.yml
+
+# Selected default image
+image: php:latest
+
+# Liste des etapes
+# stages:
+#   - build
+#   - quality
+#   - test
+
+variables:
+    APP_DIR: 'esp_ent/templates_eparapheur'
+    PHPVERSION: "7.3"
+    MYSQL_DATABASE: testautos
+    MYSQL_ROOT_PASSWORD: ChangeMe
+
+# job 'build' packaging app
+package-app:
+  stage: build
+#   image: php:5.5
+  image: node:latest
+  allow_failure: false 
+  cache:
+    - key: "apt-cache-$CI_JOB_STAGE"
+      paths:
+        - apt-cache/
+  script:
+    - sed -i 's/current-tag/${CI_COMMIT_TAG}/g' esp_ent/templates_eparapheur/config/prod.php
+    - chmod +x ./esp_ent/templates_eparapheur/install.sh
+    - chmod +x ./esp_ent/templates_eparapheur/lib/install.sh
+    - chmod +x ./esp_ent/templates_eparapheur/automation/instal.sh
+    - chmod +x ./esp_ent/templates_eparapheur/automation/less_compil.sh
+    - chmod +x ./esp_ent/templates_eparapheur/automation/api_doc.sh
+    - bash ./esp_ent/templates_eparapheur/install.sh
+    - rm -rf esp_ent/templates_eparapheur/automation
+    - rm -f esp_ent/templates_eparapheur/.env.dist
+  after_script:
+    - echo "Fin packaging app in PHP 5.5."
+  artifacts:
+    name: "templates_eparapheur_$CI_COMMIT_TAG.zip"
+    when: on_success
+    paths:
+      - "esp_ent/templates_eparapheur"
+    expire_in: 7 day
+  only:
+    - tags
+
+# job 'quality' phpstan
+phpstan:
+  stage: quality
+  image: php:8.0
+  allow_failure: false
+  cache:
+    - key: "vendor-phpstan"
+      paths:
+        - .tmp/
+        - vendor/
+    - key: "apt-cache-phpstan"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+      paths:
+        - composer.phar
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev phpstan/phpstan --no-progress --no-interaction
+  script:
+    - php vendor/bin/phpstan analyse --memory-limit 768M --error-format gitlab > phpstan_${CI_COMMIT_SHORT_SHA}.json || true
+    - if [ ! -f phpstan_${CI_COMMIT_SHORT_SHA}.json ]; then exit 1; fi
+  after_script:
+    - echo "Fin analyse phpstan"
+  artifacts:
+    reports:
+      codequality: "phpstan_$CI_COMMIT_SHORT_SHA.json"
+    when: always
+    expire_in: 7 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job 'quality' PHP CodeSniffer
+php-cs:
+  stage: quality
+  image: registry.gitlab.com/pipeline-components/php-codesniffer:latest
+  allow_failure: false
+  script:
+    - phpcs -s -p --colors --report-file=phpcs-quality-report.json || true
+    - php ci/code_quality_report.php > gl-code-quality-report_${CI_COMMIT_SHORT_SHA}.json
+    - if [ ! -f gl-code-quality-report_${CI_COMMIT_SHORT_SHA}.json ]; then exit 1; fi
+  after_script:
+    - echo "Fin analyse PHP CodeSniffer"
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report_$CI_COMMIT_SHORT_SHA.json
+    when: always
+    expire_in: 7 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job 'quality' PHP CodeSniffer PSR2 only
+php-cs-psr2:
+  stage: quality
+  image: registry.gitlab.com/pipeline-components/php-codesniffer:latest
+  allow_failure: false
+  script:
+    - >-
+      phpcs -s -p --colors
+      --standard=PSR2
+      --report=json
+      --report-file=phpcs-quality-report.json
+      --ignore="vendor" ${APP_DIR} || true
+    - php ci/code_quality_report.php > gl-code-quality-report-psr2_${CI_COMMIT_SHORT_SHA}.json
+    - if [ ! -f gl-code-quality-report-psr2_${CI_COMMIT_SHORT_SHA}.json ]; then exit 1; fi
+  after_script:
+    - echo "Fin analyse PHP CodeSniffer PSR2"
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report-psr2_$CI_COMMIT_SHORT_SHA.json
+    when: always
+    expire_in: 7 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job 'quality' phpcpd
+phpcpd:
+  stage: quality
+  image: php:8.0
+  allow_failure: false
+  cache:
+    - key: "cache-phpcpd-phar"
+      paths:
+        - phpcpd.phar
+  before_script:
+    - test -f phpcpd.phar || curl -L https://phar.phpunit.de/phpcpd.phar -o phpcpd.phar
+  script:
+    - php phpcpd.phar ${APP_DIR} > phpcpd.txt || true
+    - if [ -s phpcpd.txt ]; then exit 1; fi
+  after_script:
+    - echo "Fin analyse phpcpd"
+  artifacts:
+    name: "phpcpd_${CI_COMMIT_SHORT_SHA}.txt"
+    when: on_failure
+    paths:
+      - phpcpd.txt
+    expire_in: 2 day
+  only:
+    refs:
+      - merge_requests
+
+# job 'quality' phpmnd
+phpmnd:
+  stage: quality
+  image: php:8.0
+  allow_failure: false
+  cache:
+    - key: "vendor-phpmnd"
+      paths:
+        - vendor/
+    - key: "apt-cache-phpmnd"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+      paths:
+        - composer.phar
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev povils/phpmnd --no-progress --no-interaction
+  script:
+    - >-
+      php vendor/bin/phpmnd --progress
+      --ignore-funcs=round,sleep,abort,strpad,number_format,array_slice,strncmp,substr,mktime
+      --extensions=default_parameter,-return,argument ${APP_DIR} > phpmnd.txt || true
+    - if [ -s phpmnd.txt ]; then exit 1; fi
+  after_script:
+    - echo "Fin analyse phpmnd"
+  artifacts:
+    name: "phpmnd_${CI_COMMIT_SHORT_SHA}.txt"
+    when: on_failure
+    paths:
+      - phpmnd.txt
+    expire_in: 2 day
+  only:
+    refs:
+      - merge_requests
+
+# job 'quality' stylelint css
+stylelint-css:
+  stage: quality
+  image: registry.gitlab.com/pipeline-components/stylelint:latest
+  allow_failure: false
+  script:
+    - stylelint --color "${APP_DIR}/**/*.css" --config .stylelintrc.json --output-file stylelint-css-report.txt
+  after_script:
+    - echo "Fin analyse stylelint css"
+  artifacts:
+    name: "stylelint-css-report_${CI_COMMIT_SHORT_SHA}.txt"
+    when: on_failure
+    paths:
+      - stylelint-css-report.txt
+    expire_in: 2 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job 'quality' stylelint less
+stylelint-less:
+  stage: quality
+  image: registry.gitlab.com/pipeline-components/stylelint:latest
+  allow_failure: false
+  cache:
+    - key: "npm-less"
+      paths:
+        - .npm/
+  before_script:
+    - npm install stylelint-less stylelint-config-recommended stylelint-config-recommended-less --cache .npm --prefer-offline
+  script:
+    - stylelint --color "${APP_DIR}/**/*.less" --config .stylelintrc.less.json --output-file stylelint-less-report.txt
+  after_script:
+    - echo "Fin analyse stylelint css"
+  artifacts:
+    name: "stylelint-less-report_${CI_COMMIT_SHORT_SHA}.txt"
+    when: on_failure
+    paths:
+      - stylelint-less-report.txt
+    expire_in: 2 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job 'quality' eslint
+eslint:
+  stage: quality
+  image: node:latest
+  allow_failure: false
+  cache:
+    - key: "npm-less"
+      paths:
+        - .npm/
+  before_script:
+    - npm install eslint eslint-config-recommended eslint-plugin-dollar-sign eslint-plugin-varspacing --cache .npm --prefer-offline
+  script:
+    - node_modules/eslint/bin/eslint.js "${APP_DIR}/**" --output-file  eslints-report.html --format html
+  after_script:
+    - echo "Fin analyse stylelint css"
+  artifacts:
+    name: "eslints-report_${CI_COMMIT_SHORT_SHA}.html"
+    when: on_failure
+    paths:
+      - eslints-report.html
+    expire_in: 2 day
+  only:
+    refs:
+      - merge_requests
+      - develop
+
+# job manuel 'quality' PHP CodeSniffer
+php-cs-manual:
+  when: manual
+  stage: quality
+  image: registry.gitlab.com/pipeline-components/php-codesniffer:latest
+  script:
+    - phpcs -s -p --colors --report=full --report-file=phpcs_quality_report.txt
+  after_script:
+    - echo "Fin analyse PHP CodeSniffer manual"
+  artifacts:
+    name: "phpcs_quality_report_$CI_COMMIT_SHORT_SHA.txt"
+    when: always
+    paths:
+      - phpcs_quality_report.txt
+    expire_in: 2 day
+
+# job manuel 'quality' PhpMetrics
+phpmetrics-manual:
+  when: manual
+  stage: quality
+  image: php:8.0
+  cache:
+    - key: "vendor-phpmetrics"
+      paths:
+        - vendor/
+    - key: "apt-cache-phpmetrics"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev phpmetrics/phpmetrics --no-progress --no-interaction
+  script:
+    - php ./vendor/bin/phpmetrics --report-html=php_metrics_report ${APP_DIR}
+  after_script:
+    - echo "Fin analyse PhpMetrics manual"
+  artifacts:
+    name: "php_metrics_report_$CI_COMMIT_SHORT_SHA"
+    when: always
+    paths:
+      - php_metrics_report
+    expire_in: 2 day
+
+# job manual 'quality' phpmd
+phpmd-manual:
+  when: manual
+  stage: quality
+  image: php:8.0
+  cache:
+    - key: "vendor-phpmd"
+      paths:
+        - vendor/
+    - key: "apt-cache-phpmd"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+      paths:
+        - composer.phar
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev phpmd/phpmd --no-progress --no-interaction
+  script:
+    - vendor/bin/phpmd ${APP_DIR} html phpmd.xml --reportfile phpmd_report.html
+  after_script:
+    - echo "Fin analyse phpmd"
+  artifacts:
+    name: "phpmd-report_${CI_COMMIT_SHORT_SHA}.html"
+    when: always
+    paths:
+      - phpmd_report.html
+    expire_in: 2 day
+
+# job manual 'quality' PHP Depend
+pdepend-manual:
+  when: manual
+  stage: quality
+  image: php:8.0
+  cache:
+    - key: "vendor-pdepend"
+      paths:
+        - vendor/
+    - key: "apt-cache-pdepend"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev pdepend/pdepend --no-progress --no-interaction
+  script:
+    - php ./vendor/bin/pdepend --summary-xml=pdepend_report.xml --jdepend-chart=jdepend_report.svg --overview-pyramid=pyramid_report.svg ${APP_DIR}
+  after_script:
+    - echo "Fin analyse PHP Depend manual"
+  artifacts:
+    name: "pdepend_report_$CI_COMMIT_SHORT_SHA"
+    when: always
+    paths:
+      - pdepend_report.xml
+      - jdepend_report.svg
+      - pyramid_report.svg
+    expire_in: 2 day
+
+# job 'test' PhpDeprecationDetector 7.3
+phpdd-7.3:
+  when: manual
+  stage: test
+  image: php:8.0
+  cache:
+    - key: "vendor-phpdd"
+      paths:
+        - vendor/
+    - key: "apt-cache-phpdd"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -y zip unzip
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - rm -f composer.json composer.lock
+    - php composer.phar require --dev wapmorgan/php-deprecation-detector --no-progress --no-interaction
+  script:
+    - >-
+      php ./vendor/bin/phpdd --no-interaction
+      --target="7.3"
+      --after="5.5"
+      --exclude="vendor"
+      --output-json="phpdd.json" ${APP_DIR}
+  after_script:
+    - echo "Fin analyse PhpDeprecationDetector 7.3"
+  artifacts:
+    name: "phpdd_${CI_COMMIT_SHORT_SHA}.json"
+    when: always
+    paths:
+      - phpdd.json
+    expire_in: 2 day
+
+# job 'test' PHP CodeSniffer compatibility 7.3
+php-compatibility-7.3:
+  when: manual
+  stage: test
+  image: registry.gitlab.com/pipeline-components/php-codesniffer:latest
+  script:
+    - >-
+      phpcs -s -p --colors
+      --extensions=php
+      --standard=PHPCompatibility
+      --report=full
+      --report-file=phpcs_compatibility.txt
+      --ignore="vendor"
+      --runtime-set testVersion ${PHPVERSION} ${APP_DIR}
+  after_script:
+    - echo "Fin analyse compatibility php 7.3"
+  artifacts:
+    name: "phpcs_compatibility_${CI_COMMIT_SHORT_SHA}.txt"
+    when: always
+    paths:
+      - phpcs_compatibility.txt
+    expire_in: 2 day
+
+# job 'test' PHP CodeSniffer compatibility 7.3 esp_ent
+php-compatibility-esp_ent-7.3:
+  when: manual
+  stage: test
+  image: registry.gitlab.com/pipeline-components/php-codesniffer:latest
+  script:
+    - >-
+      phpcs -s -p --colors
+      --extensions=php
+      --standard=PHPCompatibility
+      --report=full
+      --report-file=phpcs_compatibility_esp_ent.txt
+      --ignore="vendor,*/lib/*,*/doc/*"
+      --runtime-set testVersion ${PHPVERSION} esp_ent
+  after_script:
+    - echo "Fin analyse compatibility esp_ent php 7.3"
+  artifacts:
+    name: "phpcs_compatibility_esp_ent_${CI_COMMIT_SHORT_SHA}.txt"
+    when: always
+    paths:
+      - phpcs_compatibility_esp_ent.txt
+    expire_in: 2 day
+
+# job 'test' phpunit pour srp
+phpunit_srp:
+  stage: test
+  image: php:5.5
+  services:
+    - mysql:5.7
+  allow_failure: false 
+  cache:
+    - key: "vendor-$CI_JOB_STAGE"
+      paths:
+        - vendor/
+    - key: "apt-cache-$CI_JOB_STAGE"
+      paths:
+        - apt-cache/
+    - key: "cache-composer-phar"
+      paths:
+        - composer.phar
+    - key: "cache-cacert-pem"
+      paths:
+        - cacert.pem
+  before_script:
+    - apt-get update -yqq
+    - apt-get -o dir::cache::archives="apt-cache" install -yqq libpq-dev libcurl4-gnutls-dev libicu-dev libpng-dev libxml2-dev libbz2-dev libzip-dev
+    # init password for install mysql-server
+    - debconf-set-selections <<< 'mysql-server mysql-server/root_password password ChangeMe'
+    - debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password ChangeMe'
+    # install mysql
+    - apt-get -o dir::cache::archives="apt-cache" install -y libmysqlclient-dev mysql-server mysql-client php5-mysql
+    # start service mysql
+    - service mysql start
+    # Install PHP extensions
+    - docker-php-ext-install mbstring pdo_pgsql curl intl gd xml zip bz2 opcache mysql mysqli
+    # Install & enable Xdebug for code coverage reports
+    - pear config-set http_proxy http://proxy.seres.lan:3128/
+    - pecl install xdebug-2.5.5
+    - docker-php-ext-enable xdebug
+    # add certificates acert.pem
+    - test -f cacert.pem || curl -k https://curl.se/ca/cacert.pem > cacert.pem
+    - apt-get install ca-certificates
+    - openssl x509 -outform der -in cacert.pem -out cacert.crt
+    - cp cacert.crt /usr/local/share/ca-certificates/
+    - update-ca-certificates
+    # Install and run Composer
+    - test -f composer.phar || curl -sSk https://getcomposer.org/installer | php
+    - php composer.phar install --no-progress --no-interaction
+  script:
+    # copy config
+    - cp ${APP_DIR}/tests/config_files/config_tests.php gener/config.php
+    - cp gener/host_config/hostConfig.default.php gener/host_config/hostConfig.php
+    # init bdd for tests cases
+    - mysql -uroot -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE $MYSQL_DATABASE;"
+    - mysql -uroot -p$MYSQL_ROOT_PASSWORD $MYSQL_DATABASE < ${APP_DIR}/sql/schema_001.sql
+    - mysql -uroot -p$MYSQL_ROOT_PASSWORD $MYSQL_DATABASE < ${APP_DIR}/sql/Generic/template_referencial.sql
+    - sed -i -e "s/#id#/113226/g" ${APP_DIR}/tests/config_files/template_tests.sql
+    - mysql -uroot -p$MYSQL_ROOT_PASSWORD $MYSQL_DATABASE < ${APP_DIR}/tests/config_files/template_tests.sql
+    # init autoload
+    - php composer.phar dump-autoload
+    # launch tests cases
+    - vendor/bin/phpunit --bootstrap vendor/autoload.php esp_ent/templates_eparapheur/tests/Unit dev laposte
+    - if [ -s stofile/eparapheur/logs/debug.log ]; then exit 1; fi
+  after_script:
+    - echo "Fin des tests unitaires PHP 5.5."
+  artifacts:
+    name: "debug_$CI_COMMIT_SHORT_SHA.log"
+    when: on_failure
+    paths:
+      - "stofile/eparapheur/logs/debug.log"
+    expire_in: 2 day
+  rules:
+    - if: ($CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "release" || $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event")
+      when: always
+    - when: manual
